@@ -14,6 +14,15 @@ public class CameraController : MonoBehaviour {
         public float zoomSmooth = 10;
         public float maxZoom = -2;
         public float minZoom = -15;
+        public bool smoothFollow = true;
+        public float smooth = 0.05f;
+
+        [HideInInspector]
+        public float newDistance = -8; //set by zoomInput
+        [HideInInspector]
+        public float adjustmentDistance = -8;
+
+
 
     }
 
@@ -37,12 +46,24 @@ public class CameraController : MonoBehaviour {
         public string ZOOM = "Mouse ScrollWheel";
     }
 
+    [System.Serializable]
+    public class DebugSettings
+    {
+        public bool drawDesiredCollisionLines = true;
+        public bool drawAdjustedCollisionLines = true;
+    }
+
     public PositionSettings position = new PositionSettings();
     public OrbitSettings orbit = new OrbitSettings();
     public InputSettings input = new InputSettings();
+    public DebugSettings debug = new DebugSettings();
+    public CollisionHandler collision = new CollisionHandler();
 
     Vector3 targetPosition = Vector3.zero;
     Vector3 destination = Vector3.zero;
+
+    Vector3 adjustedDestination = Vector3.zero;
+    Vector3 cameraVelocity = Vector3.zero;
 
     CharacterController characterController;
     float verticalOrbitInput, horizontalOrbitInput, zoomInput, horizontalOrbitSnapInput;
@@ -54,9 +75,12 @@ public class CameraController : MonoBehaviour {
 
         targetPosition = target.position + position.targetPositionOffset;
 
-        destination = Quaternion.Euler(orbit.xRotation, orbit.yRotation + target.eulerAngles.y, 0) * -Vector3.forward * position.distanceFromTarget;
-        destination += targetPosition;
-        transform.position = destination;
+        MoveToTarget();
+
+        collision.Initialize(Camera.main);
+        collision.UpdateCameraClipPoints(transform.position, transform.rotation, ref collision.adjustedCameralClipPoints);
+        collision.UpdateCameraClipPoints(destination, transform.rotation, ref collision.desiredCameraClipPoints);
+
 
     }
 
@@ -68,15 +92,36 @@ public class CameraController : MonoBehaviour {
     }
 	
 	// Update is called once per frame
-	void LateUpdate () {
+	void FixedUpdate () {
 
         //moving
         MoveToTarget();
 
         //rotating
         LookAtTarget();
-	
-	}
+
+        collision.UpdateCameraClipPoints(transform.position, transform.rotation, ref collision.adjustedCameralClipPoints);
+        collision.UpdateCameraClipPoints(destination, transform.rotation, ref collision.desiredCameraClipPoints);
+
+        //draw debug lines
+        for(int index = 0; index < 5; index++)
+        {
+            if(debug.drawDesiredCollisionLines)
+            {
+                Debug.DrawLine(targetPosition, collision.desiredCameraClipPoints[index], Color.white);
+            }
+            if(debug.drawAdjustedCollisionLines)
+            {
+                Debug.DrawLine(targetPosition, collision.adjustedCameralClipPoints[index], Color.green);
+            }
+        }
+
+        collision.CheckColliding(targetPosition); //using raycasts;
+
+        position.adjustmentDistance = collision.GetAdjustedDistanceWithRayFrom(targetPosition);
+
+
+    }
 
     void GetInput()
     {
@@ -109,11 +154,39 @@ public class CameraController : MonoBehaviour {
 
     void MoveToTarget()
     {
-        targetPosition = target.position + position.targetPositionOffset;
+        targetPosition = target.position + Vector3.up * position.targetPositionOffset.y + Vector3.forward * position.targetPositionOffset.z ;
 
         destination = Quaternion.Euler(orbit.xRotation, orbit.yRotation + target.eulerAngles.y, 0) * -Vector3.forward * position.distanceFromTarget;
         destination += targetPosition;
-        transform.position = destination;
+
+        if(collision.colliding)
+        {
+            adjustedDestination = Quaternion.Euler(orbit.xRotation, orbit.yRotation + target.eulerAngles.y, 0) * Vector3.forward * position.adjustmentDistance;
+            adjustedDestination += targetPosition;
+
+            if (position.smoothFollow)
+            {
+                //use smooth damp function
+                transform.position = Vector3.SmoothDamp(transform.position, adjustedDestination, ref cameraVelocity, position.smooth);
+            }
+            else
+                transform.position = adjustedDestination;
+            
+        }
+        else
+        {
+            if (position.smoothFollow)
+            {
+                //use smooth damp function
+                transform.position = Vector3.SmoothDamp(transform.position, destination, ref cameraVelocity, position.smooth);
+
+            }
+            else
+                transform.position = destination;
+        }
+        
+
+
     }
 
     void LookAtTarget()
@@ -157,6 +230,116 @@ public class CameraController : MonoBehaviour {
         }
 
 
+    }
+
+
+
+    //Camera collision
+    [System.Serializable]
+    public class CollisionHandler
+    {
+        public LayerMask collisionLayer;
+
+        [HideInInspector]
+        public bool colliding = false;
+        [HideInInspector]
+        public Vector3[] adjustedCameralClipPoints;
+        [HideInInspector]
+        public Vector3[] desiredCameraClipPoints;
+
+        Camera camera;
+
+        public void Initialize(Camera cam)
+        {
+            camera = cam;
+            adjustedCameralClipPoints = new Vector3[5];
+            desiredCameraClipPoints = new Vector3[5];
+        }
+
+        public void UpdateCameraClipPoints(Vector3 cameraPosition, Quaternion atRotation, ref Vector3[] intoArray)
+        {
+            if (!camera)
+                return;
+
+            //clear the contents of intoArray
+            intoArray = new Vector3[5];
+
+            float z = camera.nearClipPlane;
+            float x = Mathf.Tan(camera.fieldOfView / 3.41f) * z;
+            float y = x / camera.aspect;
+
+            //top left clip point
+            intoArray[0] = (atRotation * new Vector3(-x, y, z)) + cameraPosition; //added at rotated point relative to camera
+
+            //top right clip point
+            intoArray[1] = (atRotation * new Vector3(x, y, z)) + cameraPosition;
+
+            //bottom left clip point
+            intoArray[2] = (atRotation * new Vector3(-x, -y, z)) + cameraPosition;
+
+            //bottom right clip point
+            intoArray[3] = (atRotation * new Vector3(x, -y, z)) + cameraPosition;
+
+            //camera's position
+            intoArray[4] = cameraPosition - camera.transform.forward;
+        }
+
+
+        bool CollisionDetectedAtClipPoints(Vector3[] clipPoints, Vector3 fromPosition)
+        {
+            for (int index = 0; index < clipPoints.Length; index++)
+            {
+                Ray ray = new Ray(fromPosition, clipPoints[index] - fromPosition);
+                float distance = Vector3.Distance(clipPoints[index], fromPosition);
+
+                if (Physics.Raycast(ray, distance, collisionLayer))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+
+
+        public float GetAdjustedDistanceWithRayFrom(Vector3 from)
+        {
+            float distance = -1;
+
+            for (int index = 0; index < desiredCameraClipPoints.Length; index++)
+            {
+                Ray ray = new Ray(from, desiredCameraClipPoints[index] - from);
+                RaycastHit hit;
+
+                if (Physics.Raycast(ray, out hit))
+                {
+                    if (distance == -1)
+                        distance = hit.distance;
+                    else
+                    {
+                        if (hit.distance < distance)
+                            distance = hit.distance;
+                    }
+                }
+
+            }
+
+            if (distance == -1)
+                return 0;
+
+            else return distance;
+        }
+
+        public void CheckColliding(Vector3 targetPosition)
+        {
+            if (CollisionDetectedAtClipPoints(desiredCameraClipPoints, targetPosition))
+            {
+                colliding = true;
+            }
+            else
+                colliding = false;
+        }
     }
 
 }
