@@ -4,23 +4,68 @@ using System.Collections;
 public class CameraController : MonoBehaviour {
 
     public Transform target;
-    public float smoothen = 0.09f;
+    
+    [System.Serializable]
+    public class PositionSettings
+    {
+        public Vector3 targetPositionOffset = new Vector3(0, 3.4f, 0);
+        public float smoothen = 100f;
+        public float distanceFromTarget = -4f;
+        public float zoomSmooth = 10;
+        public float maxZoom = -2;
+        public float minZoom = -15;
 
-    public Vector3 offsetFromTarget = new Vector3(0, 6, -8);
-    public float xTilt = 10;
+    }
 
+    [System.Serializable]
+    public class OrbitSettings
+    {
+        public float xRotation = -20;
+        public float yRotation = -180;
+        public float maxXRotation = 25;
+        public float minXRotation = -85;
+        public float verticalOrbitSmooth = 150;
+        public float horizontalOrbitSmooth = 150;
+    }
+
+    [System.Serializable]
+    public class InputSettings
+    {
+        public string ORBIT_HORIZONTAL_SNAP = "OrbitHorizontalSnap";
+        public string ORBIT_HORZIZONTAL = "OrbitHorizontal";
+        public string ORBIT_VERTICAL = "OrbitVertical";
+        public string ZOOM = "Mouse ScrollWheel";
+    }
+
+    public PositionSettings position = new PositionSettings();
+    public OrbitSettings orbit = new OrbitSettings();
+    public InputSettings input = new InputSettings();
+
+    Vector3 targetPosition = Vector3.zero;
     Vector3 destination = Vector3.zero;
 
     CharacterController characterController;
-
-    float rotateVelocity = 0;
+    float verticalOrbitInput, horizontalOrbitInput, zoomInput, horizontalOrbitSnapInput;
 
 	// Use this for initialization
 	void Start () {
 
         SetCameraTarget(target);
-	
-	}
+
+        targetPosition = target.position + position.targetPositionOffset;
+
+        destination = Quaternion.Euler(orbit.xRotation, orbit.yRotation + target.eulerAngles.y, 0) * -Vector3.forward * position.distanceFromTarget;
+        destination += targetPosition;
+        transform.position = destination;
+
+    }
+
+    void Update()
+    {
+        GetInput();
+        OrbitTarget();
+        ZoomInOnTarget();
+    }
 	
 	// Update is called once per frame
 	void LateUpdate () {
@@ -32,6 +77,14 @@ public class CameraController : MonoBehaviour {
         LookAtTarget();
 	
 	}
+
+    void GetInput()
+    {
+        verticalOrbitInput = Input.GetAxisRaw(input.ORBIT_VERTICAL);
+        horizontalOrbitInput = Input.GetAxisRaw(input.ORBIT_HORZIZONTAL);
+        horizontalOrbitSnapInput = Input.GetAxisRaw(input.ORBIT_HORIZONTAL_SNAP);
+        zoomInput = Input.GetAxisRaw(input.ZOOM);
+    }
 
     void SetCameraTarget(Transform t)
     {
@@ -56,16 +109,54 @@ public class CameraController : MonoBehaviour {
 
     void MoveToTarget()
     {
-        destination = characterController.TargetRotation * offsetFromTarget;
-        destination += target.position;
+        targetPosition = target.position + position.targetPositionOffset;
+
+        destination = Quaternion.Euler(orbit.xRotation, orbit.yRotation + target.eulerAngles.y, 0) * -Vector3.forward * position.distanceFromTarget;
+        destination += targetPosition;
         transform.position = destination;
     }
 
     void LookAtTarget()
     {
-        float eulerYAngle = Mathf.SmoothDampAngle(transform.eulerAngles.y, target.eulerAngles.y, ref rotateVelocity, smoothen);
-        transform.rotation = Quaternion.Euler(transform.eulerAngles.x, eulerYAngle, 0);
+        Quaternion targetRotation = Quaternion.LookRotation(targetPosition - transform.position);
+        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, position.smoothen * Time.deltaTime);
     }
 
+    void OrbitTarget()
+    {
+        if(horizontalOrbitSnapInput > 0)
+        {
+            orbit.yRotation = -180;
+        }
+
+        orbit.xRotation += -verticalOrbitInput * orbit.verticalOrbitSmooth * Time.deltaTime;
+        orbit.yRotation += -horizontalOrbitInput * orbit.horizontalOrbitSmooth * Time.deltaTime;
+
+        if(orbit.xRotation > orbit.maxXRotation)
+        {
+            orbit.xRotation = orbit.maxXRotation;
+        }
+        if (orbit.xRotation < orbit.minXRotation)
+        {
+            orbit.xRotation = orbit.minXRotation;
+        }
+    }
+
+    void ZoomInOnTarget()
+    {
+        position.distanceFromTarget += zoomInput * position.zoomSmooth;
+
+        if(position.distanceFromTarget > position.maxZoom)
+        {
+            position.distanceFromTarget = position.maxZoom;
+        }
+
+        if (position.distanceFromTarget < position.minZoom)
+        {
+            position.distanceFromTarget = position.minZoom;
+        }
+
+
+    }
 
 }
