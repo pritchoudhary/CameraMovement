@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class CharacterController : MonoBehaviour {
+public class CharacterControllerTP : MonoBehaviour {
 
     public float inputDelay = -0.1f;
     public float forwardVelocity = 10.0f;
