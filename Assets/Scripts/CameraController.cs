@@ -228,8 +228,6 @@ public class CameraController : MonoBehaviour {
         {
             position.distanceFromTarget = position.minZoom;
         }
-
-
     }
 
 
