@@ -21,9 +21,6 @@ public class CameraController : MonoBehaviour {
         public float newDistance = -8; //set by zoomInput
         [HideInInspector]
         public float adjustmentDistance = -8;
-
-
-
     }
 
     [System.Serializable]
@@ -68,6 +65,14 @@ public class CameraController : MonoBehaviour {
     CharacterController characterController;
     float verticalOrbitInput, horizontalOrbitInput, zoomInput, horizontalOrbitSnapInput;
 
+    enum PlayerState
+    {
+        psWalking,
+        psInCover,
+
+        psNumOfPlayerStates               
+    }
+
 	// Use this for initialization
 	void Start () {
 
@@ -80,8 +85,6 @@ public class CameraController : MonoBehaviour {
         collision.Initialize(Camera.main);
         collision.UpdateCameraClipPoints(transform.position, transform.rotation, ref collision.adjustedCameralClipPoints);
         collision.UpdateCameraClipPoints(destination, transform.rotation, ref collision.desiredCameraClipPoints);
-
-
     }
 
     void Update()
@@ -143,7 +146,7 @@ public class CameraController : MonoBehaviour {
             }
             
             else
-                Debug.LogError("Tareget needs a character controller");
+                Debug.LogError("Target needs a character controller");
         }
 
         else
@@ -170,8 +173,7 @@ public class CameraController : MonoBehaviour {
                 transform.position = Vector3.SmoothDamp(transform.position, adjustedDestination, ref cameraVelocity, position.smooth);
             }
             else
-                transform.position = adjustedDestination;
-            
+                transform.position = adjustedDestination;       
         }
         else
         {
@@ -184,9 +186,6 @@ public class CameraController : MonoBehaviour {
             else
                 transform.position = destination;
         }
-        
-
-
     }
 
     void LookAtTarget()
