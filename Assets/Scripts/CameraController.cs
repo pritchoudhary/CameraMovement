@@ -62,7 +62,7 @@ public class CameraController : MonoBehaviour {
     Vector3 adjustedDestination = Vector3.zero;
     Vector3 cameraVelocity = Vector3.zero;
 
-    CharacterController characterController;
+    CharacterControllerTP characterController;
     float verticalOrbitInput, horizontalOrbitInput, zoomInput, horizontalOrbitSnapInput;
 
     enum PlayerState
@@ -140,9 +140,9 @@ public class CameraController : MonoBehaviour {
 
         if(target != null)
         {
-            if (target.GetComponent<CharacterController>())
+            if (target.GetComponent<CharacterControllerTP>())
             {
-                characterController = target.GetComponent<CharacterController>();
+                characterController = target.GetComponent<CharacterControllerTP>();
             }
             
             else
