@@ -65,13 +65,10 @@ public class CameraController : MonoBehaviour {
     CharacterControllerTP characterController;
     float verticalOrbitInput, horizontalOrbitInput, zoomInput, horizontalOrbitSnapInput;
 
-    enum PlayerState
-    {
-        psWalking,
-        psInCover,
-
-        psNumOfPlayerStates               
-    }
+    public CharacterStateMachine characterStateMachine;
+    public float coverPeekSmoothness = 10f;
+    public float maxPeekHeight = 5.0f;
+    public float minPeekHeight = 0.0f;
 
 	// Use this for initialization
 	void Start () {
@@ -102,6 +99,9 @@ public class CameraController : MonoBehaviour {
 
         //rotating
         LookAtTarget();
+
+        //Cover
+        CoverCam();
 
         collision.UpdateCameraClipPoints(transform.position, transform.rotation, ref collision.adjustedCameralClipPoints);
         collision.UpdateCameraClipPoints(destination, transform.rotation, ref collision.desiredCameraClipPoints);
@@ -339,4 +339,23 @@ public class CameraController : MonoBehaviour {
         }
     }
 
+    void CoverCam()
+    {
+        if (characterStateMachine.currentState == CharacterStateMachine.PlayerState.psCover)
+        {
+            if (Input.GetMouseButton(1))
+            {
+                Debug.Log("Right mouse pressed");
+                transform.position += new Vector3 (0f, (Mathf.Clamp((transform.position.y * coverPeekSmoothness * Time.deltaTime), minPeekHeight, maxPeekHeight)), 0f);
+            }
+        }
+      //  else if(characterStateMachine.currentState == CharacterStateMachine.PlayerState.psWallCover)
+      //  {
+        //    if (Input.GetMouseButton(1))
+       //     {
+      //          Debug.Log("Right mouse pressed");
+       //         transform.position += Vector3.left;
+       //     }
+     //   }
+    }
 }

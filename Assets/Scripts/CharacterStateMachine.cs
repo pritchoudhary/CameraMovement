@@ -4,7 +4,7 @@ using System.Collections;
 public class CharacterStateMachine : MonoBehaviour
 {
 
-    enum PlayerState
+    public enum PlayerState
     {
         psWalking,
         psCover,
@@ -12,18 +12,20 @@ public class CharacterStateMachine : MonoBehaviour
         psNumStates
     }
 
-    PlayerState currentState;
+    public PlayerState currentState;
 
 	// Use this for initialization
 	void Start ()
     {
         currentState = PlayerState.psWalking;
 	}
+
+    void Update()
+    {
+    }
 	
     void OnCollisionEnter (Collision other)
     {
-        Debug.Log("Collision");
-
         if (other.gameObject.tag == "Cover")
         {
             Debug.Log("Player is in cover");
